@@ -5,6 +5,7 @@ import asyncio
 import numpy as np
 from streamlit_webrtc import webrtc_streamer, VideoProcessorBase
 import streamlit as st
+import traceback
 
 asyncio.set_event_loop(asyncio.new_event_loop())
 
@@ -57,7 +58,7 @@ class Inference:
         if self.temp_dict["model"] is not None:
             self.model_path = self.temp_dict["model"]
 
-        # Chỉ ghi log trong môi trường debug
+        # Chỉ ghi log khi cần thiết
         if __debug__:
             LOGGER.info(f"Ultralytics Solutions: ✅ {self.temp_dict}")
 
@@ -95,10 +96,19 @@ class Inference:
         if self.source == "video":
             vid_file = self.st.sidebar.file_uploader("Upload Video File", type=["mp4", "mov", "avi", "mkv"])
             if vid_file is not None:
-                g = io.BytesIO(vid_file.read())
-                with open("ultralytics.mp4", "wb") as out:
-                    out.write(g.read())
-                self.vid_file_name = "ultralytics.mp4"
+                try:
+                    LOGGER.info(f"Đang xử lý tệp: {vid_file.name}, kích thước: {vid_file.size}")
+                    if vid_file.size == 0:
+                        self.st.error("Tệp video rỗng. Vui lòng tải lên tệp hợp lệ.")
+                        return
+                    g = io.BytesIO(vid_file.read())
+                    with open("ultralytics.mp4", "wb") as out:
+                        out.write(g.read())
+                    self.vid_file_name = "ultralytics.mp4"
+                    self.st.success("Tệp video đã được tải lên thành công!")
+                except Exception as e:
+                    self.st.error(f"Lỗi khi xử lý tệp video: {e}")
+                    LOGGER.error(f"Lỗi khi xử lý tệp video: {traceback.format_exc()}")
 
     def configure(self):
         available_models = [x.replace("yolo", "YOLO") for x in GITHUB_ASSETS_STEMS if x.startswith("yolo11")]
@@ -129,10 +139,11 @@ class Inference:
                     key="example",
                     video_processor_factory=VideoProcessor,
                     media_stream_constraints={"video": True},
+                    async_processing=True,
                 )
             except Exception as e:
                 self.st.error(f"Lỗi khi chạy webcam: {e}")
-                LOGGER.error(f"Lỗi khi chạy webcam: {e}")
+                LOGGER.error(f"Lỗi khi chạy webcam: {traceback.format_exc()}")
 
 def main():
     import sys
