@@ -16,11 +16,10 @@ from ultralytics.utils.downloads import GITHUB_ASSETS_STEMS
 class VideoProcessor(VideoProcessorBase):
     def __init__(self):
         try:
-            # Kiểm tra và tải mô hình YOLO
-            self.model = YOLO("yolov8.pt")  # Đảm bảo mô hình YOLO đã được cài đúng
-            self.selected_ind = [0, 1]  # Ví dụ: phát hiện các lớp cụ thể
-            self.conf = 0.25  # Ngưỡng độ tin cậy
-            self.iou = 0.45  # Ngưỡng IoU
+            self.model = YOLO("yolov8.pt")
+            self.selected_ind = [0, 1]
+            self.conf = 0.25
+            self.iou = 0.45
             LOGGER.info("YOLO model loaded successfully.")
         except Exception as e:
             LOGGER.error(f"Error loading YOLO model: {e}")
@@ -31,18 +30,17 @@ class VideoProcessor(VideoProcessorBase):
         img = frame.to_ndarray(format="bgr24")
         if img is not None and self.model:
             try:
-                # Xử lý khung hình với mô hình YOLO
                 results = self.model(img, conf=self.conf, iou=self.iou, classes=self.selected_ind)
-                annotated_frame = results[0].plot()  # Khung hình đã được chú thích
+                annotated_frame = results[0].plot()
                 return annotated_frame
             except Exception as e:
                 LOGGER.error(f"Error processing frame with YOLO model: {e}")
                 st.error(f"Error processing frame with YOLO model: {e}")
-        return img  # Nếu không có khung hình, trả về khung hình gốc
+        return img
 
 class Inference:
     def __init__(self, **kwargs: Any):
-        check_requirements("streamlit>=1.29.0")  # Kiểm tra yêu cầu Streamlit
+        check_requirements("streamlit>=1.29.0")
         self.st = st
         self.source = None
         self.enable_trk = False
@@ -59,7 +57,9 @@ class Inference:
         if self.temp_dict["model"] is not None:
             self.model_path = self.temp_dict["model"]
 
-        LOGGER.info(f"Ultralytics Solutions: ✅ {self.temp_dict}")
+        # Chỉ ghi log trong môi trường debug
+        if __debug__:
+            LOGGER.info(f"Ultralytics Solutions: ✅ {self.temp_dict}")
 
     def web_ui(self):
         menu_style_cfg = """<style>MainMenu {visibility: hidden;}</style>"""
@@ -125,19 +125,24 @@ class Inference:
 
         if self.st.sidebar.button("Start"):
             try:
-                # Kiểm tra webcam có sẵn hay không và khởi chạy WebRTC
                 webrtc_streamer(
                     key="example",
-                    video_processor_factory=VideoProcessor,  # Sử dụng VideoProcessor thay vì VideoTransformer
-                    media_stream_constraints={"video": True},  # Yêu cầu video từ webcam
+                    video_processor_factory=VideoProcessor,
+                    media_stream_constraints={"video": True},
                 )
             except Exception as e:
-                self.st.error(f"Error: {e}")
-                LOGGER.error(f"Error during webcam processing: {e}")
+                self.st.error(f"Lỗi khi chạy webcam: {e}")
+                LOGGER.error(f"Lỗi khi chạy webcam: {e}")
 
-if __name__ == "__main__":
+def main():
     import sys
-
     args = len(sys.argv)
     model = sys.argv[1] if args > 1 else None
-    Inference(model=model).inference()
+
+    if 'inference' not in st.session_state:
+        st.session_state.inference = Inference(model=model)
+
+    st.session_state.inference.inference()
+
+if __name__ == "__main__":
+    main()
