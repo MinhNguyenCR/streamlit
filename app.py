@@ -4,6 +4,7 @@ import numpy as np
 import streamlit as st
 import traceback
 import logging
+from typing import Any
 
 from ultralytics import YOLO
 from ultralytics.utils import LOGGER
@@ -14,7 +15,7 @@ from ultralytics.utils.downloads import GITHUB_ASSETS_STEMS
 logging.basicConfig(level=logging.DEBUG)
 
 class Inference:
-    def __init__(self, **kwargs: Any):  # Sửa lại cú pháp của __init__ đúng cách
+    def __init__(self, **kwargs):  # Sửa lại cú pháp của __init__ đúng cách
         check_requirements("streamlit>=1.29.0")
         self.st = st
         self.source = None
@@ -61,17 +62,17 @@ class Inference:
             logo = "https://raw.githubusercontent.com/ultralytics/assets/main/logo/Ultralytics_Logotype_Original.svg"
             self.st.image(logo, width=250)
 
-        self.st.sidebar.title("User Configuration")
-        self.source = self.st.sidebar.selectbox(
-            "Video", ("webcam", "video")
-        )
-        self.enable_trk = self.st.sidebar.radio("Enable Tracking", ("Yes", "No"))
-        self.conf = float(self.st.sidebar.slider("Confidence Threshold", 0.0, 1.0, self.conf, 0.01))
-        self.iou = float(self.st.sidebar.slider("IoU Threshold", 0.0, 1.0, self.iou, 0.01))
+            self.st.sidebar.title("User Configuration")
+            self.source = self.st.sidebar.selectbox(
+                "Video", ("webcam", "video")
+            )
+            self.enable_trk = self.st.sidebar.radio("Enable Tracking", ("Yes", "No"))
+            self.conf = float(self.st.sidebar.slider("Confidence Threshold", 0.0, 1.0, self.conf, 0.01))
+            self.iou = float(self.st.sidebar.slider("IoU Threshold", 0.0, 1.0, self.iou, 0.01))
 
-        col1, col2 = self.st.columns(2)
-        self.org_frame = col1.empty()
-        self.ann_frame = col2.empty()
+            col1, col2 = self.st.columns(2)
+            self.org_frame = col1.empty()
+            self.ann_frame = col2.empty()
 
     def source_upload(self):
         self.vid_file_name = ""
