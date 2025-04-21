@@ -14,7 +14,7 @@ from ultralytics.utils.downloads import GITHUB_ASSETS_STEMS
 logging.basicConfig(level=logging.DEBUG)
 
 class Inference:
-    def __init__(self, **kwargs: Any):  # Sửa lại từ __init__ thành phương thức khởi tạo đúng
+    def __init__(self, **kwargs: Any):  # Sửa lại cú pháp của __init__ đúng cách
         check_requirements("streamlit>=1.29.0")
         self.st = st
         self.source = None
