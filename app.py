@@ -6,6 +6,7 @@ import numpy as np
 from streamlit_webrtc import webrtc_streamer, VideoProcessorBase
 import streamlit as st
 
+# Thiết lập vòng lặp sự kiện mới
 asyncio.set_event_loop(asyncio.new_event_loop())
 
 from ultralytics import YOLO
@@ -118,7 +119,7 @@ class Inference:
             # Cập nhật cấu hình WebRTC
             webrtc_streamer(
                 key="example", 
-                video_processor_factory=VideoProcessor,  # Tham số mới
+                video_processor_factory=VideoProcessor,  # Sử dụng video_processor_factory thay cho video_transformer_factory
                 media_stream_constraints={"video": True},  # Đảm bảo yêu cầu video
             )
 
