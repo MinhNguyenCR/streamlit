@@ -85,10 +85,8 @@ class Inference:
                         self.st.error("Tệp video rỗng. Vui lòng tải lên tệp hợp lệ.")
                         return
                     with io.BytesIO(vid_file.read()) as g:
-                        LOGGER.info("Đã đọc tệp vào BytesIO")
                         with open("ultralytics.mp4", "wb") as out:
                             out.write(g.read())
-                            LOGGER.info("Đã ghi tệp ra ultralytics.mp4")
                     self.vid_file_name = "ultralytics.mp4"
                     self.st.success("Tệp video đã được tải lên thành công!")
                 except Exception as e:
