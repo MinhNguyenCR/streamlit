@@ -3,3 +3,4 @@ streamlit-webrtc
 ultralytics
 opencv-python-headless
 av
+tornado>=6.0.0
