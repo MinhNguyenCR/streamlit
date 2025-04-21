@@ -19,14 +19,27 @@ from ultralytics.utils.downloads import GITHUB_ASSETS_STEMS
 # Cấu hình logging
 logging.basicConfig(level=logging.DEBUG)
 
-# Cấu hình WebRTC với nhiều ICE server
+# Cấu hình WebRTC với STUN và TURN
 RTC_CONFIGURATION = RTCConfiguration(
     {
         "iceServers": [
             {"urls": ["stun:stun.l.google.com:19302"]},
             {"urls": ["stun:stun1.l.google.com:19302"]},
-            {"urls": ["stun:stun2.l.google.com:19302"]}
-        ]
+            {"urls": ["stun:stun2.l.google.com:19302"]},
+            {
+                "urls": ["turn:openrelay.metered.ca:80"],
+                "username": "openrelayproject",
+                "credential": "openrelayproject"
+            },
+            {
+                "urls": ["turn:openrelay.metered.ca:443"],
+                "username": "openrelayproject",
+                "credential": "openrelayproject"
+            }
+        ],
+        "iceTransportPolicy": "all",
+        "rtcpMuxPolicy": "require",
+        "bundlePolicy": "balanced"
     }
 )
 
@@ -183,7 +196,7 @@ class Inference:
 
         if self.source == "webcam" and st.session_state.webcam_active:
             try:
-                self.st.info("Đang khởi động webcam... Vui lòng đảm bảo webcam hoạt động.")
+                self.st.info("Đang khởi động webcam... Vui lòng đảm bảo webcam hoạt động và mạng ổn định.")
                 LOGGER.debug(f"Khởi tạo webrtc_streamer với key: {st.session_state.webcam_key}")
                 webrtc_streamer(
                     key=st.session_state.webcam_key,
@@ -194,6 +207,7 @@ class Inference:
                     },
                     async_processing=True,
                     rtc_configuration=RTC_CONFIGURATION,
+                    timeout=30  # Tăng thời gian chờ lên 30 giây
                 )
                 LOGGER.debug("webrtc_streamer đã khởi tạo thành công")
             except Exception as e:
