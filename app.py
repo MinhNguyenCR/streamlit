@@ -6,6 +6,7 @@ import numpy as np
 from streamlit_webrtc import webrtc_streamer, VideoProcessorBase, RTCConfiguration
 import streamlit as st
 import traceback
+import uuid
 
 asyncio.set_event_loop(asyncio.new_event_loop())
 
@@ -14,7 +15,7 @@ from ultralytics.utils import LOGGER
 from ultralytics.utils.checks import check_requirements
 from ultralytics.utils.downloads import GITHUB_ASSETS_STEMS
 
-# Cấu hình WebRTC để cải thiện kết nối
+# Cấu hình WebRTC
 RTC_CONFIGURATION = RTCConfiguration(
     {"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]}
 )
@@ -23,7 +24,7 @@ class VideoProcessor(VideoProcessorBase):
     def __init__(self):
         self.model = None
         try:
-            self.model = YOLO("yolov8n.pt")  # Sử dụng mô hình nhẹ
+            self.model = YOLO("yolov8n.pt")  # Mô hình nhẹ
             self.selected_ind = [0, 1]
             self.conf = 0.25
             self.iou = 0.45
@@ -46,6 +47,7 @@ class VideoProcessor(VideoProcessorBase):
             except Exception as e:
                 LOGGER.error(f"Error processing frame with YOLO model: {e}")
                 st.error(f"Error processing frame: {e}")
+                return img  # Trả về khung hình gốc nếu lỗi
         else:
             LOGGER.warning("No YOLO model available for processing")
         return img
@@ -64,7 +66,7 @@ class Inference:
         self.selected_ind = []
         self.model = None
 
-        # Mặc định sử dụng yolov8n.pt
+        # Mặc định yolov8n.pt
         self.temp_dict = {"model": kwargs.get("model", "yolov8n.pt"), **kwargs}
         self.model_path = self.temp_dict["model"]
 
@@ -86,7 +88,7 @@ class Inference:
 
     def sidebar(self):
         with self.st.sidebar:
-            logo = "https://raw.githubusercontent.cominflammatory/ultralytics/assets/main/logo/Ultralytics_Logotype_Original.svg"
+            logo = "https://raw.githubusercontent.com/ultralytics/assets/main/logo/Ultralytics_Logotype_Original.svg"
             self.st.image(logo, width=250)
 
         self.st.sidebar.title("User Configuration")
@@ -154,10 +156,14 @@ class Inference:
             try:
                 if self.source == "webcam":
                     self.st.info("Đang khởi động webcam... Vui lòng cấp quyền truy cập webcam.")
+                    # Sử dụng khóa duy nhất để tránh xung đột khi rerun
                     webrtc_streamer(
-                        key="example",
+                        key=f"webcam-{str(uuid.uuid4())}",
                         video_processor_factory=VideoProcessor,
-                        media_stream_constraints={"video": True, "audio": False},
+                        media_stream_constraints={
+                            "video": {"width": {"ideal": 640}, "height": {"ideal": 480}},
+                            "audio": False
+                        },
                         async_processing=True,
                         rtc_configuration=RTC_CONFIGURATION,
                     )
