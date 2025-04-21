@@ -19,9 +19,15 @@ from ultralytics.utils.downloads import GITHUB_ASSETS_STEMS
 # Cấu hình logging
 logging.basicConfig(level=logging.DEBUG)
 
-# Cấu hình WebRTC
+# Cấu hình WebRTC với nhiều ICE server
 RTC_CONFIGURATION = RTCConfiguration(
-    {"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]}
+    {
+        "iceServers": [
+            {"urls": ["stun:stun.l.google.com:19302"]},
+            {"urls": ["stun:stun1.l.google.com:19302"]},
+            {"urls": ["stun:stun2.l.google.com:19302"]}
+        ]
+    }
 )
 
 class VideoProcessor(VideoProcessorBase):
@@ -40,25 +46,25 @@ class VideoProcessor(VideoProcessorBase):
 
     def transform(self, frame):
         LOGGER.debug("Nhận khung hình mới trong transform")
-        img = frame.to_ndarray(format="bgr24")
-        if img is None:
-            LOGGER.warning("Khung hình rỗng nhận được")
-            return img
+        try:
+            img = frame.to_ndarray(format="bgr24")
+            if img is None:
+                LOGGER.warning("Khung hình rỗng nhận được")
+                return img
 
-        if self.model:
-            try:
+            if self.model:
                 LOGGER.debug("Xử lý khung hình với mô hình YOLO")
                 results = self.model(img, conf=self.conf, iou=self.iou, classes=self.selected_ind)
                 annotated_frame = results[0].plot()
                 LOGGER.debug("Khung hình đã được xử lý thành công")
                 return annotated_frame
-            except Exception as e:
-                LOGGER.error(f"Error processing frame with YOLO model: {e}")
-                st.error(f"Error processing frame: {e}")
-                return img  # Trả về khung hình gốc nếu lỗi
-        else:
-            LOGGER.warning("Không có mô hình YOLO để xử lý khung hình")
-            return img
+            else:
+                LOGGER.warning("Không có mô hình YOLO để xử lý khung hình")
+                return img
+        except Exception as e:
+            LOGGER.error(f"Error processing frame with YOLO model: {e}")
+            st.error(f"Error processing frame: {e}")
+            return img  # Trả về khung hình gốc nếu lỗi
 
 class Inference:
     def __init__(self, **kwargs: Any):
@@ -160,29 +166,36 @@ class Inference:
         self.source_upload()
         self.configure()
 
-        # Sử dụng session_state để theo dõi trạng thái webcam
+        # Quản lý trạng thái webcam
         if 'webcam_active' not in st.session_state:
             st.session_state.webcam_active = False
+        if 'webcam_key' not in st.session_state:
+            st.session_state.webcam_key = str(uuid.uuid4())
 
         if self.st.sidebar.button("Start"):
             st.session_state.webcam_active = True
+            st.session_state.webcam_key = str(uuid.uuid4())  # Tạo key mới khi nhấn Start
             LOGGER.info("Nút Start được nhấn, khởi động webcam")
+
+        if self.st.sidebar.button("Stop"):
+            st.session_state.webcam_active = False
+            LOGGER.info("Nút Stop được nhấn, dừng webcam")
 
         if self.source == "webcam" and st.session_state.webcam_active:
             try:
                 self.st.info("Đang khởi động webcam... Vui lòng đảm bảo webcam hoạt động.")
-                LOGGER.debug("Khởi tạo webrtc_streamer")
+                LOGGER.debug(f"Khởi tạo webrtc_streamer với key: {st.session_state.webcam_key}")
                 webrtc_streamer(
-                    key=f"webcam-{str(uuid.uuid4())}",
+                    key=st.session_state.webcam_key,
                     video_processor_factory=VideoProcessor,
                     media_stream_constraints={
-                        "video": {"width": {"ideal": 320}, "height": {"ideal": 240}},  # Giảm độ phân giải
+                        "video": {"width": {"ideal": 320}, "height": {"ideal": 240}},
                         "audio": False
                     },
                     async_processing=True,
                     rtc_configuration=RTC_CONFIGURATION,
                 )
-                LOGGER.debug("webrtc_streamer đã khởi tạo")
+                LOGGER.debug("webrtc_streamer đã khởi tạo thành công")
             except Exception as e:
                 self.st.error(f"Lỗi khi chạy webcam: {e}")
                 LOGGER.error(f"Lỗi khi chạy webcam: {traceback.format_exc()}")
