@@ -3,7 +3,7 @@ from typing import Any
 import cv2
 import asyncio
 import numpy as np
-from streamlit_webrtc import webrtc_streamer, VideoProcessorBase
+from streamlit_webrtc import webrtc_streamer, VideoProcessorBase, RTCConfiguration
 import streamlit as st
 import traceback
 
@@ -14,29 +14,40 @@ from ultralytics.utils import LOGGER
 from ultralytics.utils.checks import check_requirements
 from ultralytics.utils.downloads import GITHUB_ASSETS_STEMS
 
+# Cấu hình WebRTC để cải thiện kết nối
+RTC_CONFIGURATION = RTCConfiguration(
+    {"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]}
+)
+
 class VideoProcessor(VideoProcessorBase):
     def __init__(self):
+        self.model = None
         try:
-            self.model = YOLO("yolov8.pt")  # Tải mô hình mặc định
+            self.model = YOLO("yolov8n.pt")  # Sử dụng mô hình nhẹ
             self.selected_ind = [0, 1]
             self.conf = 0.25
             self.iou = 0.45
-            LOGGER.info("YOLO model loaded successfully.")
+            LOGGER.info("YOLO model loaded successfully in VideoProcessor.")
         except Exception as e:
-            LOGGER.error(f"Error loading YOLO model: {e}")
-            st.error(f"Error loading YOLO model: {e}")
-            self.model = None
+            LOGGER.error(f"Error loading YOLO model in VideoProcessor: {e}")
+            st.error(f"Error loading YOLO model in VideoProcessor: {e}")
 
     def transform(self, frame):
         img = frame.to_ndarray(format="bgr24")
-        if img is not None and self.model:
+        if img is None:
+            LOGGER.warning("Received empty frame")
+            return img
+
+        if self.model:
             try:
                 results = self.model(img, conf=self.conf, iou=self.iou, classes=self.selected_ind)
                 annotated_frame = results[0].plot()
                 return annotated_frame
             except Exception as e:
                 LOGGER.error(f"Error processing frame with YOLO model: {e}")
-                st.error(f"Error processing frame with YOLO model: {e}")
+                st.error(f"Error processing frame: {e}")
+        else:
+            LOGGER.warning("No YOLO model available for processing")
         return img
 
 class Inference:
@@ -53,11 +64,11 @@ class Inference:
         self.selected_ind = []
         self.model = None
 
-        # Mặc định sử dụng yolov8n.pt nếu không có mô hình
+        # Mặc định sử dụng yolov8n.pt
         self.temp_dict = {"model": kwargs.get("model", "yolov8n.pt"), **kwargs}
         self.model_path = self.temp_dict["model"]
 
-        # Tắt log trừ khi cần debug
+        # Chỉ log khi debug
         if __debug__:
             LOGGER.debug(f"Ultralytics Solutions: ✅ {self.temp_dict}")
 
@@ -66,7 +77,7 @@ class Inference:
         main_title_cfg = """<div><h1 style="color:#FF64DA; text-align:center; font-size:40px; margin-top:-50px;
         font-family: 'Archivo', sans-serif; margin-bottom:20px;">Ultralytics YOLO Streamlit Application</h1></div>"""
         sub_title_cfg = """<div><h4 style="color:#042AFF; text-align:center; font-family: 'Archivo', sans-serif; 
-        margin-top:-15px; màn hình-bottom:50px;">Experience real-time object detection on your webcam with the power 
+        margin-top:-15px; margin-bottom:50px;">Experience real-time object detection on your webcam with the power 
         of Ultralytics YOLO! 🚀</h4></div>"""
         self.st.set_page_config(page_title="Ultralytics Streamlit App", layout="wide")
         self.st.markdown(menu_style_cfg, unsafe_allow_html=True)
@@ -75,7 +86,7 @@ class Inference:
 
     def sidebar(self):
         with self.st.sidebar:
-            logo = "https://raw.githubusercontent.com/ultralytics/assets/main/logo/Ultralytics_Logotype_Original.svg"
+            logo = "https://raw.githubusercontent.cominflammatory/ultralytics/assets/main/logo/Ultralytics_Logotype_Original.svg"
             self.st.image(logo, width=250)
 
         self.st.sidebar.title("User Configuration")
@@ -142,11 +153,13 @@ class Inference:
         if self.st.sidebar.button("Start"):
             try:
                 if self.source == "webcam":
+                    self.st.info("Đang khởi động webcam... Vui lòng cấp quyền truy cập webcam.")
                     webrtc_streamer(
                         key="example",
                         video_processor_factory=VideoProcessor,
-                        media_stream_constraints={"video": True},
+                        media_stream_constraints={"video": True, "audio": False},
                         async_processing=True,
+                        rtc_configuration=RTC_CONFIGURATION,
                     )
                 elif self.source == "video" and self.vid_file_name:
                     cap = cv2.VideoCapture(self.vid_file_name)
