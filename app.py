@@ -16,8 +16,8 @@ from ultralytics.utils.downloads import GITHUB_ASSETS_STEMS
 class VideoProcessor(VideoProcessorBase):
     def __init__(self):
         try:
-            # Đảm bảo mô hình YOLO được tải đúng cách
-            self.model = YOLO("yolov8.pt")  # Kiểm tra đường dẫn đến mô hình
+            # Kiểm tra và tải mô hình YOLO
+            self.model = YOLO("yolov8.pt")  # Đảm bảo mô hình YOLO đã được cài đúng
             self.selected_ind = [0, 1]  # Ví dụ: phát hiện các lớp cụ thể
             self.conf = 0.25  # Ngưỡng độ tin cậy
             self.iou = 0.45  # Ngưỡng IoU
@@ -31,6 +31,7 @@ class VideoProcessor(VideoProcessorBase):
         img = frame.to_ndarray(format="bgr24")
         if img is not None and self.model:
             try:
+                # Xử lý khung hình với mô hình YOLO
                 results = self.model(img, conf=self.conf, iou=self.iou, classes=self.selected_ind)
                 annotated_frame = results[0].plot()  # Khung hình đã được chú thích
                 return annotated_frame
@@ -127,7 +128,7 @@ class Inference:
                 # Kiểm tra webcam có sẵn hay không và khởi chạy WebRTC
                 webrtc_streamer(
                     key="example",
-                    video_processor_factory=VideoProcessor,  # Dùng video_processor_factory thay cho video_transformer_factory
+                    video_processor_factory=VideoProcessor,  # Sử dụng VideoProcessor thay vì VideoTransformer
                     media_stream_constraints={"video": True},  # Yêu cầu video từ webcam
                 )
             except Exception as e:
