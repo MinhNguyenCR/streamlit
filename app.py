@@ -156,7 +156,6 @@ class Inference:
             try:
                 if self.source == "webcam":
                     self.st.info("Đang khởi động webcam... Vui lòng cấp quyền truy cập webcam.")
-                    # Sử dụng khóa duy nhất để tránh xung đột khi rerun
                     webrtc_streamer(
                         key=f"webcam-{str(uuid.uuid4())}",
                         video_processor_factory=VideoProcessor,
