@@ -206,8 +206,7 @@ class Inference:
                         "audio": False
                     },
                     async_processing=True,
-                    rtc_configuration=RTC_CONFIGURATION,
-                    timeout=30  # Tăng thời gian chờ lên 30 giây
+                    rtc_configuration=RTC_CONFIGURATION
                 )
                 LOGGER.debug("webrtc_streamer đã khởi tạo thành công")
             except Exception as e:
