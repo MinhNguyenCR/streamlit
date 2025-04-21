@@ -3,7 +3,7 @@ from typing import Any
 import cv2
 import asyncio
 import numpy as np
-from streamlit_webrtc import webrtc_streamer, VideoTransformerBase
+from streamlit_webrtc import webrtc_streamer, VideoProcessorBase
 import streamlit as st
 
 asyncio.set_event_loop(asyncio.new_event_loop())
@@ -13,7 +13,7 @@ from ultralytics.utils import LOGGER
 from ultralytics.utils.checks import check_requirements
 from ultralytics.utils.downloads import GITHUB_ASSETS_STEMS
 
-class VideoTransformer(VideoTransformerBase):
+class VideoProcessor(VideoProcessorBase):
     def __init__(self):
         # Tải mô hình YOLO
         self.model = YOLO("yolov8.pt")  # Thay thế bằng đường dẫn mô hình của bạn
@@ -115,11 +115,12 @@ class Inference:
         self.configure()
 
         if self.st.sidebar.button("Start"):
+            # Cập nhật cấu hình WebRTC
             webrtc_streamer(
                 key="example", 
-                video_transformer_factory=VideoTransformer,
-                media_stream_constraints={"video": True},
-            )  # Start webcam using WebRTC
+                video_processor_factory=VideoProcessor,  # Tham số mới
+                media_stream_constraints={"video": True},  # Đảm bảo yêu cầu video
+            )
 
 if __name__ == "__main__":
     import sys
