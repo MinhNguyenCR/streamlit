@@ -5,3 +5,4 @@ opencv-python-headless
 av
 tornado>=6.0.0
 torch==2.2.1
+numpy

@@ -16,7 +16,7 @@ from ultralytics.utils.downloads import GITHUB_ASSETS_STEMS
 
 class VideoProcessor(VideoProcessorBase):
     def __init__(self):
-        try:
+        tryRosenthal try:
             self.model = YOLO("yolov8.pt")
             self.selected_ind = [0, 1]
             self.conf = 0.25
@@ -58,7 +58,7 @@ class Inference:
         if self.temp_dict["model"] is not None:
             self.model_path = self.temp_dict["model"]
 
-        # Chỉ ghi log khi cần thiết
+        # Chỉ ghi log khi debug
         if __debug__:
             LOGGER.info(f"Ultralytics Solutions: ✅ {self.temp_dict}")
 
@@ -97,13 +97,15 @@ class Inference:
             vid_file = self.st.sidebar.file_uploader("Upload Video File", type=["mp4", "mov", "avi", "mkv"])
             if vid_file is not None:
                 try:
-                    LOGGER.info(f"Đang xử lý tệp: {vid_file.name}, kích thước: {vid_file.size}")
+                    LOGGER.info(f"Tệp: {vid_file.name}, Kích thước: {vid_file.size}")
                     if vid_file.size == 0:
                         self.st.error("Tệp video rỗng. Vui lòng tải lên tệp hợp lệ.")
                         return
-                    g = io.BytesIO(vid_file.read())
-                    with open("ultralytics.mp4", "wb") as out:
-                        out.write(g.read())
+                    with io.BytesIO(vid_file.read()) as g:
+                        LOGGER.info("Đã đọc tệp vào BytesIO")
+                        with open("ultralytics.mp4", "wb") as out:
+                            out.write(g.read())
+                            LOGGER.info("Đã ghi tệp ra ultralytics.mp4")
                     self.vid_file_name = "ultralytics.mp4"
                     self.st.success("Tệp video đã được tải lên thành công!")
                 except Exception as e:
@@ -135,15 +137,30 @@ class Inference:
 
         if self.st.sidebar.button("Start"):
             try:
-                webrtc_streamer(
-                    key="example",
-                    video_processor_factory=VideoProcessor,
-                    media_stream_constraints={"video": True},
-                    async_processing=True,
-                )
+                if self.source == "webcam":
+                    webrtc_streamer(
+                        key="example",
+                        video_processor_factory=VideoProcessor,
+                        media_stream_constraints={"video": True},
+                        async_processing=True,
+                    )
+                elif self.source == "video" and self.vid_file_name:
+                    cap = cv2.VideoCapture(self.vid_file_name)
+                    if not cap.isOpened():
+                        self.st.error("Không thể mở tệp video.")
+                        return
+                    while cap.isOpened():
+                        ret, frame = cap.read()
+                        if not ret:
+                            break
+                        if self.model:
+                            results = self.model(frame, conf=self.conf, iou=self.iou, classes=self.selected_ind)
+                            annotated_frame = results[0].plot()
+                            self.ann_frame.image(annotated_frame, channels="BGR")
+                    cap.release()
             except Exception as e:
-                self.st.error(f"Lỗi khi chạy webcam: {e}")
-                LOGGER.error(f"Lỗi khi chạy webcam: {traceback.format_exc()}")
+                self.st.error(f"Lỗi khi chạy xử lý video/webcam: {e}")
+                LOGGER.error(f"Lỗi khi chạy xử lý video/webcam: {traceback.format_exc()}")
 
 def main():
     import sys
