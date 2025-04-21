@@ -19,13 +19,15 @@ from ultralytics.utils.downloads import GITHUB_ASSETS_STEMS
 # Cấu hình logging
 logging.basicConfig(level=logging.DEBUG)
 
-# Cấu hình WebRTC với STUN và TURN
+# Cấu hình WebRTC với nhiều STUN/TURN server
 RTC_CONFIGURATION = RTCConfiguration(
     {
         "iceServers": [
             {"urls": ["stun:stun.l.google.com:19302"]},
             {"urls": ["stun:stun1.l.google.com:19302"]},
             {"urls": ["stun:stun2.l.google.com:19302"]},
+            {"urls": ["stun:stun3.l.google.com:19302"]},
+            {"urls": ["stun:stun4.l.google.com:19302"]},
             {
                 "urls": ["turn:openrelay.metered.ca:80"],
                 "username": "openrelayproject",
@@ -35,6 +37,11 @@ RTC_CONFIGURATION = RTCConfiguration(
                 "urls": ["turn:openrelay.metered.ca:443"],
                 "username": "openrelayproject",
                 "credential": "openrelayproject"
+            },
+            {
+                "urls": ["turn:relay1.expressturn.com:3478"],
+                "username": "efW8W5J5J5J5J5J5",
+                "credential": "J5J5J5J5J5J5J5J5"
             }
         ],
         "iceTransportPolicy": "all",
@@ -198,7 +205,7 @@ class Inference:
             try:
                 self.st.info("Đang khởi động webcam... Vui lòng đảm bảo webcam hoạt động và mạng ổn định.")
                 LOGGER.debug(f"Khởi tạo webrtc_streamer với key: {st.session_state.webcam_key}")
-                webrtc_streamer(
+                webrtc_ctx = webrtc_streamer(
                     key=st.session_state.webcam_key,
                     video_processor_factory=VideoProcessor,
                     media_stream_constraints={
@@ -209,6 +216,10 @@ class Inference:
                     rtc_configuration=RTC_CONFIGURATION
                 )
                 LOGGER.debug("webrtc_streamer đã khởi tạo thành công")
+                if webrtc_ctx.state.playing:
+                    LOGGER.info("WebRTC stream is playing")
+                else:
+                    LOGGER.warning("WebRTC stream is not playing")
             except Exception as e:
                 self.st.error(f"Lỗi khi chạy webcam: {e}")
                 LOGGER.error(f"Lỗi khi chạy webcam: {traceback.format_exc()}")
