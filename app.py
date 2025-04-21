@@ -1,5 +1,4 @@
 import io
-from typing import Any
 import cv2
 import numpy as np
 import streamlit as st
@@ -148,12 +147,13 @@ class Inference:
                     self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
                     self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
 
+                # Kiểm tra nếu không thể mở webcam
                 if not self.cap.isOpened():
                     self.st.error("Không thể mở webcam. Vui lòng kiểm tra thiết bị.")
                     st.session_state.webcam_active = False
                     return
+                LOGGER.info("Webcam đang chạy... Nhấn Stop để dừng.")
 
-                self.st.info("Webcam đang chạy... Nhấn Stop để dừng.")
                 while st.session_state.webcam_active:
                     ret, frame = self.cap.read()
                     if not ret:
