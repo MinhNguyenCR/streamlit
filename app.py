@@ -16,8 +16,8 @@ from ultralytics.utils.downloads import GITHUB_ASSETS_STEMS
 
 class VideoProcessor(VideoProcessorBase):
     def __init__(self):
-        try:  # Sửa lỗi cú pháp: thay tryRosenthal try thành try
-            self.model = YOLO("yolov8.pt")
+        try:
+            self.model = YOLO("yolov8.pt")  # Tải mô hình mặc định
             self.selected_ind = [0, 1]
             self.conf = 0.25
             self.iou = 0.45
@@ -53,21 +53,20 @@ class Inference:
         self.selected_ind = []
         self.model = None
 
-        self.temp_dict = {"model": None, **kwargs}
-        self.model_path = None
-        if self.temp_dict["model"] is not None:
-            self.model_path = self.temp_dict["model"]
+        # Mặc định sử dụng yolov8n.pt nếu không có mô hình
+        self.temp_dict = {"model": kwargs.get("model", "yolov8n.pt"), **kwargs}
+        self.model_path = self.temp_dict["model"]
 
-        # Chỉ ghi log khi debug
+        # Tắt log trừ khi cần debug
         if __debug__:
-            LOGGER.info(f"Ultralytics Solutions: ✅ {self.temp_dict}")
+            LOGGER.debug(f"Ultralytics Solutions: ✅ {self.temp_dict}")
 
     def web_ui(self):
         menu_style_cfg = """<style>MainMenu {visibility: hidden;}</style>"""
         main_title_cfg = """<div><h1 style="color:#FF64DA; text-align:center; font-size:40px; margin-top:-50px;
         font-family: 'Archivo', sans-serif; margin-bottom:20px;">Ultralytics YOLO Streamlit Application</h1></div>"""
         sub_title_cfg = """<div><h4 style="color:#042AFF; text-align:center; font-family: 'Archivo', sans-serif; 
-        margin-top:-15px; margin-bottom:50px;">Experience real-time object detection on your webcam with the power 
+        margin-top:-15px; màn hình-bottom:50px;">Experience real-time object detection on your webcam with the power 
         of Ultralytics YOLO! 🚀</h4></div>"""
         self.st.set_page_config(page_title="Ultralytics Streamlit App", layout="wide")
         self.st.markdown(menu_style_cfg, unsafe_allow_html=True)
@@ -116,12 +115,17 @@ class Inference:
         available_models = [x.replace("yolo", "YOLO") for x in GITHUB_ASSETS_STEMS if x.startswith("yolo11")]
         if self.model_path:
             available_models.insert(0, self.model_path.split(".pt")[0])
-        selected_model = self.st.sidebar.selectbox("Model", available_models)
+        selected_model = self.st.sidebar.selectbox("Model", available_models, index=0)
 
-        with self.st.spinner("Model is downloading..."):
-            self.model = YOLO(f"{selected_model.lower()}.pt")
-            class_names = list(self.model.names.values())
-        self.st.success("Model loaded successfully!")
+        try:
+            with self.st.spinner("Model is downloading..."):
+                self.model = YOLO(f"{selected_model.lower()}.pt")
+                class_names = list(self.model.names.values())
+            self.st.success("Model loaded successfully!")
+        except Exception as e:
+            self.st.error(f"Lỗi khi tải mô hình: {e}")
+            LOGGER.error(f"Lỗi khi tải mô hình: {traceback.format_exc()}")
+            return
 
         selected_classes = self.st.sidebar.multiselect("Classes", class_names, default=class_names[:3])
         self.selected_ind = [class_names.index(option) for option in selected_classes]
@@ -165,7 +169,7 @@ class Inference:
 def main():
     import sys
     args = len(sys.argv)
-    model = sys.argv[1] if args > 1 else None
+    model = sys.argv[1] if args > 1 else "yolov8n.pt"  # Mặc định yolov8n.pt
 
     if 'inference' not in st.session_state:
         st.session_state.inference = Inference(model=model)
