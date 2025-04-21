@@ -16,7 +16,7 @@ from ultralytics.utils.downloads import GITHUB_ASSETS_STEMS
 
 class VideoProcessor(VideoProcessorBase):
     def __init__(self):
-        tryRosenthal try:
+        try:  # Sửa lỗi cú pháp: thay tryRosenthal try thành try
             self.model = YOLO("yolov8.pt")
             self.selected_ind = [0, 1]
             self.conf = 0.25
