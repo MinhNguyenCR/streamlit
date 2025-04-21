@@ -2,7 +2,6 @@
 
 import io
 from typing import Any
-
 import cv2
 
 from ultralytics import YOLO
