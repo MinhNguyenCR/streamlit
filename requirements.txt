@@ -4,5 +4,4 @@ ultralytics
 opencv-python-headless
 av
 tornado>=6.0.0
-torch==2.0.1  # Cập nhật phiên bản PyTorch
-ultralytics==8.0.0  # Cập nhật phiên bản Ultralytics
+torch==2.0.1
