@@ -7,6 +7,7 @@ from streamlit_webrtc import webrtc_streamer, VideoProcessorBase, RTCConfigurati
 import streamlit as st
 import traceback
 import uuid
+import logging
 
 asyncio.set_event_loop(asyncio.new_event_loop())
 
@@ -14,6 +15,9 @@ from ultralytics import YOLO
 from ultralytics.utils import LOGGER
 from ultralytics.utils.checks import check_requirements
 from ultralytics.utils.downloads import GITHUB_ASSETS_STEMS
+
+# Cấu hình logging
+logging.basicConfig(level=logging.DEBUG)
 
 # Cấu hình WebRTC
 RTC_CONFIGURATION = RTCConfiguration(
@@ -24,6 +28,7 @@ class VideoProcessor(VideoProcessorBase):
     def __init__(self):
         self.model = None
         try:
+            LOGGER.info("Đang tải mô hình YOLO trong VideoProcessor...")
             self.model = YOLO("yolov8n.pt")  # Mô hình nhẹ
             self.selected_ind = [0, 1]
             self.conf = 0.25
@@ -34,23 +39,26 @@ class VideoProcessor(VideoProcessorBase):
             st.error(f"Error loading YOLO model in VideoProcessor: {e}")
 
     def transform(self, frame):
+        LOGGER.debug("Nhận khung hình mới trong transform")
         img = frame.to_ndarray(format="bgr24")
         if img is None:
-            LOGGER.warning("Received empty frame")
+            LOGGER.warning("Khung hình rỗng nhận được")
             return img
 
         if self.model:
             try:
+                LOGGER.debug("Xử lý khung hình với mô hình YOLO")
                 results = self.model(img, conf=self.conf, iou=self.iou, classes=self.selected_ind)
                 annotated_frame = results[0].plot()
+                LOGGER.debug("Khung hình đã được xử lý thành công")
                 return annotated_frame
             except Exception as e:
                 LOGGER.error(f"Error processing frame with YOLO model: {e}")
                 st.error(f"Error processing frame: {e}")
                 return img  # Trả về khung hình gốc nếu lỗi
         else:
-            LOGGER.warning("No YOLO model available for processing")
-        return img
+            LOGGER.warning("Không có mô hình YOLO để xử lý khung hình")
+            return img
 
 class Inference:
     def __init__(self, **kwargs: Any):
@@ -152,38 +160,51 @@ class Inference:
         self.source_upload()
         self.configure()
 
+        # Sử dụng session_state để theo dõi trạng thái webcam
+        if 'webcam_active' not in st.session_state:
+            st.session_state.webcam_active = False
+
         if self.st.sidebar.button("Start"):
+            st.session_state.webcam_active = True
+            LOGGER.info("Nút Start được nhấn, khởi động webcam")
+
+        if self.source == "webcam" and st.session_state.webcam_active:
             try:
-                if self.source == "webcam":
-                    self.st.info("Đang khởi động webcam... Vui lòng cấp quyền truy cập webcam.")
-                    # Sử dụng khóa duy nhất để tránh xung đột khi rerun
-                    webrtc_streamer(
-                        key=f"webcam-{str(uuid.uuid4())}",
-                        video_processor_factory=VideoProcessor,
-                        media_stream_constraints={
-                            "video": {"width": {"ideal": 640}, "height": {"ideal": 480}},
-                            "audio": False
-                        },
-                        async_processing=True,
-                        rtc_configuration=RTC_CONFIGURATION,
-                    )
-                elif self.source == "video" and self.vid_file_name:
-                    cap = cv2.VideoCapture(self.vid_file_name)
-                    if not cap.isOpened():
-                        self.st.error("Không thể mở tệp video.")
-                        return
-                    while cap.isOpened():
-                        ret, frame = cap.read()
-                        if not ret:
-                            break
-                        if self.model:
-                            results = self.model(frame, conf=self.conf, iou=self.iou, classes=self.selected_ind)
-                            annotated_frame = results[0].plot()
-                            self.ann_frame.image(annotated_frame, channels="BGR")
-                    cap.release()
+                self.st.info("Đang khởi động webcam... Vui lòng đảm bảo webcam hoạt động.")
+                LOGGER.debug("Khởi tạo webrtc_streamer")
+                webrtc_streamer(
+                    key=f"webcam-{str(uuid.uuid4())}",
+                    video_processor_factory=VideoProcessor,
+                    media_stream_constraints={
+                        "video": {"width": {"ideal": 320}, "height": {"ideal": 240}},  # Giảm độ phân giải
+                        "audio": False
+                    },
+                    async_processing=True,
+                    rtc_configuration=RTC_CONFIGURATION,
+                )
+                LOGGER.debug("webrtc_streamer đã khởi tạo")
             except Exception as e:
-                self.st.error(f"Lỗi khi chạy xử lý video/webcam: {e}")
-                LOGGER.error(f"Lỗi khi chạy xử lý video/webcam: {traceback.format_exc()}")
+                self.st.error(f"Lỗi khi chạy webcam: {e}")
+                LOGGER.error(f"Lỗi khi chạy webcam: {traceback.format_exc()}")
+                st.session_state.webcam_active = False
+        elif self.source == "video" and self.vid_file_name:
+            try:
+                cap = cv2.VideoCapture(self.vid_file_name)
+                if not cap.isOpened():
+                    self.st.error("Không thể mở tệp video.")
+                    return
+                while cap.isOpened():
+                    ret, frame = cap.read()
+                    if not ret:
+                        break
+                    if self.model:
+                        results = self.model(frame, conf=self.conf, iou=self.iou, classes=self.selected_ind)
+                        annotated_frame = results[0].plot()
+                        self.ann_frame.image(annotated_frame, channels="BGR")
+                cap.release()
+            except Exception as e:
+                self.st.error(f"Lỗi khi xử lý video: {e}")
+                LOGGER.error(f"Lỗi khi xử lý video: {traceback.format_exc()}")
 
 def main():
     import sys
