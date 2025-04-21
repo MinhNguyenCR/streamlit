@@ -3,6 +3,8 @@
 import io
 from typing import Any
 import cv2
+import asyncio
+asyncio.set_event_loop(asyncio.new_event_loop())
 
 from ultralytics import YOLO
 from ultralytics.utils import LOGGER
