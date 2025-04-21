@@ -4,3 +4,4 @@ ultralytics
 opencv-python-headless
 av
 tornado>=6.0.0
+torch==2.0.1
