@@ -1,33 +1,35 @@
 import io
-from typing import Any
-import cv2
 import asyncio
-import numpy as np
-from streamlit_webrtc import webrtc_streamer, VideoProcessorBase, RTCConfiguration
-import streamlit as st
-import traceback
 import uuid
-
-asyncio.set_event_loop(asyncio.new_event_loop())
-
+import traceback
+import numpy as np
+import cv2
+import streamlit as st
+from typing import Any
+from streamlit_webrtc import webrtc_streamer, VideoProcessorBase, RTCConfiguration
 from ultralytics import YOLO
 from ultralytics.utils import LOGGER
 from ultralytics.utils.checks import check_requirements
 from ultralytics.utils.downloads import GITHUB_ASSETS_STEMS
 
-# Cấu hình WebRTC
+# Cấu hình WebRTC với các máy chủ STUN để đảm bảo kết nối ổn định
 RTC_CONFIGURATION = RTCConfiguration(
     {"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]}
 )
 
+# Đảm bảo asyncio sử dụng EpollSelector
+asyncio.set_event_loop(asyncio.new_event_loop())
+
 class VideoProcessor(VideoProcessorBase):
     def __init__(self):
         self.model = None
+        self.selected_ind = [0, 1]
+        self.conf = 0.25
+        self.iou = 0.45
+        
         try:
-            self.model = YOLO("yolov8n.pt")  # Mô hình nhẹ
-            self.selected_ind = [0, 1]
-            self.conf = 0.25
-            self.iou = 0.45
+            # Tải mô hình YOLO nhẹ (yolov8n.pt)
+            self.model = YOLO("yolov8n.pt")
             LOGGER.info("YOLO model loaded successfully in VideoProcessor.")
         except Exception as e:
             LOGGER.error(f"Error loading YOLO model in VideoProcessor: {e}")
@@ -41,13 +43,14 @@ class VideoProcessor(VideoProcessorBase):
 
         if self.model:
             try:
+                # Áp dụng mô hình YOLO vào khung hình
                 results = self.model(img, conf=self.conf, iou=self.iou, classes=self.selected_ind)
-                annotated_frame = results[0].plot()
+                annotated_frame = results[0].plot()  # Vẽ kết quả lên khung hình
                 return annotated_frame
             except Exception as e:
                 LOGGER.error(f"Error processing frame with YOLO model: {e}")
                 st.error(f"Error processing frame: {e}")
-                return img  # Trả về khung hình gốc nếu lỗi
+                return img
         else:
             LOGGER.warning("No YOLO model available for processing")
         return img
@@ -57,22 +60,14 @@ class Inference:
         check_requirements("streamlit>=1.29.0")
         self.st = st
         self.source = None
-        self.enable_trk = False
+        self.vid_file_name = None
+        self.model = None
+        self.selected_ind = []
         self.conf = 0.25
         self.iou = 0.45
-        self.org_frame = None
-        self.ann_frame = None
-        self.vid_file_name = None
-        self.selected_ind = []
-        self.model = None
 
-        # Mặc định yolov8n.pt
-        self.temp_dict = {"model": kwargs.get("model", "yolov8n.pt"), **kwargs}
-        self.model_path = self.temp_dict["model"]
-
-        # Chỉ log khi debug
-        if __debug__:
-            LOGGER.debug(f"Ultralytics Solutions: ✅ {self.temp_dict}")
+        # Thiết lập mô hình mặc định là yolov8n.pt
+        self.model_path = kwargs.get("model", "yolov8n.pt")
 
     def web_ui(self):
         menu_style_cfg = """<style>MainMenu {visibility: hidden;}</style>"""
@@ -92,10 +87,7 @@ class Inference:
             self.st.image(logo, width=250)
 
         self.st.sidebar.title("User Configuration")
-        self.source = self.st.sidebar.selectbox(
-            "Video", ("webcam", "video")
-        )
-        self.enable_trk = self.st.sidebar.radio("Enable Tracking", ("Yes", "No"))
+        self.source = self.st.sidebar.selectbox("Video", ("webcam", "video"))
         self.conf = float(self.st.sidebar.slider("Confidence Threshold", 0.0, 1.0, self.conf, 0.01))
         self.iou = float(self.st.sidebar.slider("IoU Threshold", 0.0, 1.0, self.iou, 0.01))
 
@@ -114,10 +106,8 @@ class Inference:
                         self.st.error("Tệp video rỗng. Vui lòng tải lên tệp hợp lệ.")
                         return
                     with io.BytesIO(vid_file.read()) as g:
-                        LOGGER.info("Đã đọc tệp vào BytesIO")
                         with open("ultralytics.mp4", "wb") as out:
                             out.write(g.read())
-                            LOGGER.info("Đã ghi tệp ra ultralytics.mp4")
                     self.vid_file_name = "ultralytics.mp4"
                     self.st.success("Tệp video đã được tải lên thành công!")
                 except Exception as e:
@@ -142,9 +132,6 @@ class Inference:
 
         selected_classes = self.st.sidebar.multiselect("Classes", class_names, default=class_names[:3])
         self.selected_ind = [class_names.index(option) for option in selected_classes]
-
-        if not isinstance(self.selected_ind, list):
-            self.selected_ind = list(self.selected_ind)
 
     def inference(self):
         self.web_ui()
