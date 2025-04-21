@@ -1,6 +1,5 @@
 streamlit
 streamlit-webrtc
-opencv-python-headless
 ultralytics
 opencv-python
 av
