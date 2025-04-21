@@ -6,7 +6,6 @@ import numpy as np
 from streamlit_webrtc import webrtc_streamer, VideoProcessorBase
 import streamlit as st
 
-# Thiết lập vòng lặp sự kiện mới
 asyncio.set_event_loop(asyncio.new_event_loop())
 
 from ultralytics import YOLO
@@ -18,12 +17,12 @@ class VideoProcessor(VideoProcessorBase):
     def __init__(self):
         # Tải mô hình YOLO
         self.model = YOLO("yolov8.pt")  # Thay thế bằng đường dẫn mô hình của bạn
-        self.selected_ind = [0, 1]  # Ví dụ: phát hiện các lớp cụ thể (bạn có thể thay đổi các lớp muốn nhận diện)
-        self.conf = 0.25  # Ngưỡng độ tin cậy (confidence threshold)
-        self.iou = 0.45  # Ngưỡng IoU (Intersection-over-Union threshold)
+        self.selected_ind = [0, 1]  # Ví dụ: phát hiện các lớp cụ thể
+        self.conf = 0.25  # Ngưỡng độ tin cậy
+        self.iou = 0.45  # Ngưỡng IoU
 
     def transform(self, frame):
-        # Chuyển đổi khung hình từ WebRTC thành định dạng OpenCV
+        # Chuyển đổi khung hình thành định dạng OpenCV
         img = frame.to_ndarray(format="bgr24")
         if img is not None:
             # Xử lý khung hình với mô hình YOLO
@@ -54,7 +53,6 @@ class Inference:
         LOGGER.info(f"Ultralytics Solutions: ✅ {self.temp_dict}")
 
     def web_ui(self):
-        # Cấu hình giao diện Streamlit
         menu_style_cfg = """<style>MainMenu {visibility: hidden;}</style>"""
         main_title_cfg = """<div><h1 style="color:#FF64DA; text-align:center; font-size:40px; margin-top:-50px;
         font-family: 'Archivo', sans-serif; margin-bottom:20px;">Ultralytics YOLO Streamlit Application</h1></div>"""
@@ -67,25 +65,23 @@ class Inference:
         self.st.markdown(sub_title_cfg, unsafe_allow_html=True)
 
     def sidebar(self):
-        # Cấu hình sidebar của Streamlit
         with self.st.sidebar:
             logo = "https://raw.githubusercontent.com/ultralytics/assets/main/logo/Ultralytics_Logotype_Original.svg"
             self.st.image(logo, width=250)
 
         self.st.sidebar.title("User Configuration")
         self.source = self.st.sidebar.selectbox(
-            "Video", ("webcam", "video")  # Cho phép lựa chọn giữa webcam hoặc tải video
+            "Video", ("webcam", "video")
         )
-        self.enable_trk = self.st.sidebar.radio("Enable Tracking", ("Yes", "No"))  # Có bật theo dõi vật thể không
-        self.conf = float(self.st.sidebar.slider("Confidence Threshold", 0.0, 1.0, self.conf, 0.01))  # Độ tin cậy
-        self.iou = float(self.st.sidebar.slider("IoU Threshold", 0.0, 1.0, self.iou, 0.01))  # Ngưỡng IoU
+        self.enable_trk = self.st.sidebar.radio("Enable Tracking", ("Yes", "No"))
+        self.conf = float(self.st.sidebar.slider("Confidence Threshold", 0.0, 1.0, self.conf, 0.01))
+        self.iou = float(self.st.sidebar.slider("IoU Threshold", 0.0, 1.0, self.iou, 0.01))
 
         col1, col2 = self.st.columns(2)
         self.org_frame = col1.empty()
         self.ann_frame = col2.empty()
 
     def source_upload(self):
-        # Xử lý tải video nếu chọn nguồn là video
         self.vid_file_name = ""
         if self.source == "video":
             vid_file = self.st.sidebar.file_uploader("Upload Video File", type=["mp4", "mov", "avi", "mkv"])
@@ -96,7 +92,6 @@ class Inference:
                 self.vid_file_name = "ultralytics.mp4"
 
     def configure(self):
-        # Cấu hình và tải mô hình YOLO
         available_models = [x.replace("yolo", "YOLO") for x in GITHUB_ASSETS_STEMS if x.startswith("yolo11")]
         if self.model_path:
             available_models.insert(0, self.model_path.split(".pt")[0])
@@ -119,14 +114,17 @@ class Inference:
         self.source_upload()
         self.configure()
 
-        # Khởi chạy WebRTC để mở webcam
         if self.st.sidebar.button("Start"):
-            # WebRTC stream
-            webrtc_streamer(
-                key="example", 
-                video_processor_factory=VideoProcessor,  # Sử dụng video_processor_factory thay cho video_transformer_factory
-                media_stream_constraints={"video": True},  # Đảm bảo yêu cầu video
-            )
+            try:
+                # Kiểm tra webcam có sẵn hay không và khởi chạy WebRTC
+                webrtc_streamer(
+                    key="example",
+                    video_processor_factory=VideoProcessor,  # Dùng video_processor_factory thay cho video_transformer_factory
+                    media_stream_constraints={"video": True},  # Yêu cầu video từ webcam
+                )
+            except Exception as e:
+                self.st.error(f"Error: {e}")
+                LOGGER.error(f"Error during webcam processing: {e}")
 
 if __name__ == "__main__":
     import sys
