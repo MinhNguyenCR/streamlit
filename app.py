@@ -7,7 +7,6 @@ from streamlit_webrtc import webrtc_streamer, VideoProcessorBase, RTCConfigurati
 import streamlit as st
 import traceback
 import uuid
-import logging
 
 asyncio.set_event_loop(asyncio.new_event_loop())
 
@@ -16,54 +15,42 @@ from ultralytics.utils import LOGGER
 from ultralytics.utils.checks import check_requirements
 from ultralytics.utils.downloads import GITHUB_ASSETS_STEMS
 
-# Cấu hình logging
-logging.basicConfig(level=logging.DEBUG)
-
-# Cấu hình WebRTC với nhiều STUN/TURN server
+# Cấu hình WebRTC
 RTC_CONFIGURATION = RTCConfiguration(
-    {
-        "iceServers": [
-            {"urls": ["stun:stun.l.google.com:19302"]},
-            {"urls": ["stun:stun1.l.google.com:19302"]},
-            {"urls": ["stun:stun2.l.google.com:19302"]},
-            {"urls": ["stun:stun3.l.google.com:19302"]},
-            {"urls": ["stun:stun4.l.google.com:19302"]},
-            {
-                "urls": ["turn:openrelay.metered.ca:80"],
-                "username": "openrelayproject",
-                "credential": "openrelayproject"
-            },
-            {
-                "urls": ["turn:openrelay.metered.ca:443"],
-                "username": "openrelayproject",
-                "credential": "openrelayproject"
-            },
-            {
-                "urls": ["turn:relay1.expressturn.com:3478"],
-                "username": "efW8W5J5J5J5J5J5",
-                "credential": "J5J5J5J5J5J5J5J5"
-            }
-        ],
-        "iceTransportPolicy": "all",
-        "rtcpMuxPolicy": "require",
-        "bundlePolicy": "balanced"
-    }
+    {"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]}
 )
 
 class VideoProcessor(VideoProcessorBase):
-    def transform(self, frame):
-        LOGGER.debug("Nhận khung hình mới trong transform")
+    def __init__(self):
+        self.model = None
         try:
-            img = frame.to_ndarray(format="bgr24")
-            if img is None:
-                LOGGER.warning("Khung hình rỗng nhận được")
-                return img
-            LOGGER.debug("Trả về khung hình gốc để kiểm tra webcam")
-            return img  # Tạm thời bỏ qua YOLO để kiểm tra
+            self.model = YOLO("yolov8n.pt")  # Mô hình nhẹ
+            self.selected_ind = [0, 1]
+            self.conf = 0.25
+            self.iou = 0.45
+            LOGGER.info("YOLO model loaded successfully in VideoProcessor.")
         except Exception as e:
-            LOGGER.error(f"Error processing frame: {e}")
-            st.error(f"Error processing frame: {e}")
+            LOGGER.error(f"Error loading YOLO model in VideoProcessor: {e}")
+            st.error(f"Error loading YOLO model in VideoProcessor: {e}")
+
+    def transform(self, frame):
+        img = frame.to_ndarray(format="bgr24")
+        if img is None:
+            LOGGER.warning("Received empty frame")
             return img
+
+        if self.model:
+            try:
+                results = self.model(img, conf=self.conf, iou=self.iou, classes=self.selected_ind)
+                annotated_frame = results[0].plot()
+                return annotated_frame
+            except Exception as e:
+                LOGGER.error(f"Error processing frame with YOLO model: {e}")
+                st.error(f"Error processing frame: {e}")
+                return img  # Trả về khung hình gốc nếu lỗi
+        else:
+            LOGGER.warning("No YOLO model available for processing")
+        return img
 
 class Inference:
     def __init__(self, **kwargs: Any):
@@ -83,6 +70,7 @@ class Inference:
         self.temp_dict = {"model": kwargs.get("model", "yolov8n.pt"), **kwargs}
         self.model_path = self.temp_dict["model"]
 
+        # Chỉ log khi debug
         if __debug__:
             LOGGER.debug(f"Ultralytics Solutions: ✅ {self.temp_dict}")
 
@@ -164,66 +152,43 @@ class Inference:
         self.source_upload()
         self.configure()
 
-        if 'webcam_active' not in st.session_state:
-            st.session_state.webcam_active = False
-        if 'webcam_key' not in st.session_state:
-            st.session_state.webcam_key = str(uuid.uuid4())
-
         if self.st.sidebar.button("Start"):
-            st.session_state.webcam_active = True
-            st.session_state.webcam_key = str(uuid.uuid4())
-            LOGGER.info("Nút Start được nhấn, khởi động webcam")
-
-        if self.st.sidebar.button("Stop"):
-            st.session_state.webcam_active = False
-            LOGGER.info("Nút Stop được nhấn, dừng webcam")
-
-        if self.source == "webcam" and st.session_state.webcam_active:
             try:
-                self.st.info("Đang khởi động webcam... Vui lòng đảm bảo webcam hoạt động và mạng ổn định.")
-                LOGGER.debug(f"Khởi tạo webrtc_streamer với key: {st.session_state.webcam_key}")
-                webrtc_ctx = webrtc_streamer(
-                    key=st.session_state.webcam_key,
-                    video_processor_factory=VideoProcessor,
-                    media_stream_constraints={
-                        "video": {"width": {"ideal": 320}, "height": {"ideal": 240}},
-                        "audio": False
-                    },
-                    async_processing=True,
-                    rtc_configuration=RTC_CONFIGURATION
-                )
-                LOGGER.debug("webrtc_streamer đã khởi tạo thành công")
-                if webrtc_ctx.state.playing:
-                    LOGGER.info("WebRTC stream is playing")
-                else:
-                    LOGGER.warning("WebRTC stream is not playing")
+                if self.source == "webcam":
+                    self.st.info("Đang khởi động webcam... Vui lòng cấp quyền truy cập webcam.")
+                    # Sử dụng khóa duy nhất để tránh xung đột khi rerun
+                    webrtc_streamer(
+                        key=f"webcam-{str(uuid.uuid4())}",
+                        video_processor_factory=VideoProcessor,
+                        media_stream_constraints={
+                            "video": {"width": {"ideal": 640}, "height": {"ideal": 480}},
+                            "audio": False
+                        },
+                        async_processing=True,
+                        rtc_configuration=RTC_CONFIGURATION,
+                    )
+                elif self.source == "video" and self.vid_file_name:
+                    cap = cv2.VideoCapture(self.vid_file_name)
+                    if not cap.isOpened():
+                        self.st.error("Không thể mở tệp video.")
+                        return
+                    while cap.isOpened():
+                        ret, frame = cap.read()
+                        if not ret:
+                            break
+                        if self.model:
+                            results = self.model(frame, conf=self.conf, iou=self.iou, classes=self.selected_ind)
+                            annotated_frame = results[0].plot()
+                            self.ann_frame.image(annotated_frame, channels="BGR")
+                    cap.release()
             except Exception as e:
-                self.st.error(f"Lỗi khi chạy webcam: {e}")
-                LOGGER.error(f"Lỗi khi chạy webcam: {traceback.format_exc()}")
-                st.session_state.webcam_active = False
-        elif self.source == "video" and self.vid_file_name:
-            try:
-                cap = cv2.VideoCapture(self.vid_file_name)
-                if not cap.isOpened():
-                    self.st.error("Không thể mở tệp video.")
-                    return
-                while cap.isOpened():
-                    ret, frame = cap.read()
-                    if not ret:
-                        break
-                    if self.model:
-                        results = self.model(frame, conf=self.conf, iou=self.iou, classes=self.selected_ind)
-                        annotated_frame = results[0].plot()
-                        self.ann_frame.image(annotated_frame, channels="BGR")
-                cap.release()
-            except Exception as e:
-                self.st.error(f"Lỗi khi xử lý video: {e}")
-                LOGGER.error(f"Lỗi khi xử lý video: {traceback.format_exc()}")
+                self.st.error(f"Lỗi khi chạy xử lý video/webcam: {e}")
+                LOGGER.error(f"Lỗi khi chạy xử lý video/webcam: {traceback.format_exc()}")
 
 def main():
     import sys
     args = len(sys.argv)
-    model = sys.argv[1] if args > 1 else "yolov8n.pt"
+    model = sys.argv[1] if args > 1 else "yolov8n.pt"  # Mặc định yolov8n.pt
 
     if 'inference' not in st.session_state:
         st.session_state.inference = Inference(model=model)
