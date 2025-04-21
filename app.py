@@ -51,19 +51,6 @@ RTC_CONFIGURATION = RTCConfiguration(
 )
 
 class VideoProcessor(VideoProcessorBase):
-    def __init__(self):
-        self.model = None
-        try:
-            LOGGER.info("Đang tải mô hình YOLO trong VideoProcessor...")
-            self.model = YOLO("yolov8n.pt")  # Mô hình nhẹ
-            self.selected_ind = [0, 1]
-            self.conf = 0.25
-            self.iou = 0.45
-            LOGGER.info("YOLO model loaded successfully in VideoProcessor.")
-        except Exception as e:
-            LOGGER.error(f"Error loading YOLO model in VideoProcessor: {e}")
-            st.error(f"Error loading YOLO model in VideoProcessor: {e}")
-
     def transform(self, frame):
         LOGGER.debug("Nhận khung hình mới trong transform")
         try:
@@ -71,20 +58,12 @@ class VideoProcessor(VideoProcessorBase):
             if img is None:
                 LOGGER.warning("Khung hình rỗng nhận được")
                 return img
-
-            if self.model:
-                LOGGER.debug("Xử lý khung hình với mô hình YOLO")
-                results = self.model(img, conf=self.conf, iou=self.iou, classes=self.selected_ind)
-                annotated_frame = results[0].plot()
-                LOGGER.debug("Khung hình đã được xử lý thành công")
-                return annotated_frame
-            else:
-                LOGGER.warning("Không có mô hình YOLO để xử lý khung hình")
-                return img
+            LOGGER.debug("Trả về khung hình gốc để kiểm tra webcam")
+            return img  # Tạm thời bỏ qua YOLO để kiểm tra
         except Exception as e:
-            LOGGER.error(f"Error processing frame with YOLO model: {e}")
+            LOGGER.error(f"Error processing frame: {e}")
             st.error(f"Error processing frame: {e}")
-            return img  # Trả về khung hình gốc nếu lỗi
+            return img
 
 class Inference:
     def __init__(self, **kwargs: Any):
@@ -104,7 +83,6 @@ class Inference:
         self.temp_dict = {"model": kwargs.get("model", "yolov8n.pt"), **kwargs}
         self.model_path = self.temp_dict["model"]
 
-        # Chỉ log khi debug
         if __debug__:
             LOGGER.debug(f"Ultralytics Solutions: ✅ {self.temp_dict}")
 
@@ -186,7 +164,6 @@ class Inference:
         self.source_upload()
         self.configure()
 
-        # Quản lý trạng thái webcam
         if 'webcam_active' not in st.session_state:
             st.session_state.webcam_active = False
         if 'webcam_key' not in st.session_state:
@@ -194,7 +171,7 @@ class Inference:
 
         if self.st.sidebar.button("Start"):
             st.session_state.webcam_active = True
-            st.session_state.webcam_key = str(uuid.uuid4())  # Tạo key mới khi nhấn Start
+            st.session_state.webcam_key = str(uuid.uuid4())
             LOGGER.info("Nút Start được nhấn, khởi động webcam")
 
         if self.st.sidebar.button("Stop"):
@@ -246,7 +223,7 @@ class Inference:
 def main():
     import sys
     args = len(sys.argv)
-    model = sys.argv[1] if args > 1 else "yolov8n.pt"  # Mặc định yolov8n.pt
+    model = sys.argv[1] if args > 1 else "yolov8n.pt"
 
     if 'inference' not in st.session_state:
         st.session_state.inference = Inference(model=model)
