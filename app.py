@@ -15,29 +15,28 @@ from ultralytics.utils.downloads import GITHUB_ASSETS_STEMS
 
 class VideoProcessor(VideoProcessorBase):
     def __init__(self):
-        # Tải mô hình YOLO
         try:
-            self.model = YOLO("yolov8.pt")  # Thay thế bằng đường dẫn mô hình của bạn
+            # Đảm bảo mô hình YOLO được tải đúng cách
+            self.model = YOLO("yolov8.pt")  # Kiểm tra đường dẫn đến mô hình
             self.selected_ind = [0, 1]  # Ví dụ: phát hiện các lớp cụ thể
             self.conf = 0.25  # Ngưỡng độ tin cậy
             self.iou = 0.45  # Ngưỡng IoU
+            LOGGER.info("YOLO model loaded successfully.")
         except Exception as e:
             LOGGER.error(f"Error loading YOLO model: {e}")
             st.error(f"Error loading YOLO model: {e}")
+            self.model = None
 
     def transform(self, frame):
-        # Chuyển đổi khung hình thành định dạng OpenCV
         img = frame.to_ndarray(format="bgr24")
-        if img is not None:
-            # Xử lý khung hình với mô hình YOLO
+        if img is not None and self.model:
             try:
                 results = self.model(img, conf=self.conf, iou=self.iou, classes=self.selected_ind)
                 annotated_frame = results[0].plot()  # Khung hình đã được chú thích
-                return annotated_frame  # Trả về khung hình đã xử lý
+                return annotated_frame
             except Exception as e:
                 LOGGER.error(f"Error processing frame with YOLO model: {e}")
                 st.error(f"Error processing frame with YOLO model: {e}")
-                return img  # Nếu có lỗi, trả về khung hình gốc
         return img  # Nếu không có khung hình, trả về khung hình gốc
 
 class Inference:
