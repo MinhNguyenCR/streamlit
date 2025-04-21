@@ -175,12 +175,14 @@ class Inference:
                     while cap.isOpened():
                         ret, frame = cap.read()
                         if not ret:
-                            break
+                            break  # Dừng khi không còn frame
                         if self.model:
                             results = self.model(frame, conf=self.conf, iou=self.iou, classes=self.selected_ind)
                             annotated_frame = results[0].plot()
                             self.ann_frame.image(annotated_frame, channels="BGR")
                     cap.release()
+                else:
+                    self.st.info("Vui lòng chọn một nguồn video hoặc webcam.")
             except Exception as e:
                 self.st.error(f"Lỗi khi chạy xử lý video/webcam: {e}")
                 LOGGER.error(f"Lỗi khi chạy xử lý video/webcam: {traceback.format_exc()}")
